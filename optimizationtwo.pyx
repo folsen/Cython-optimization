@@ -3,6 +3,9 @@ from scipy.linalg import (norm, solve, cholesky, solve_triangular)
 import numpy as np
 cimport numpy as np
 
+cdef extern from "math.h":
+    double abs(double)
+
 DTYPE = np.int
 ctypedef np.int_t DTYPE_T
 
@@ -23,7 +26,9 @@ class OptimizationMethod (object):
     cdef int maxit = 100
     cdef double tol = 1e-8
     cdef double alpha 
-
+    cdef char* ls = self.linesearch
+    cdef char* none = "None"
+    cdef char* exact = "Exact"
     g = self.prob.g
 
     cdef np.ndarray H, xold, s
@@ -34,36 +39,21 @@ class OptimizationMethod (object):
         H = self.initial_h(x)
       else:
         # Update - this function and the one above can be integrated into one
-        H = self.update(H, x, xold, alpha, s)
+        H = update(g, H, x, xold, alpha, s)
 
-      s = self.chol_solve(H, g(x))
-      if self.linesearch == 'None':
+      s = chol_solve(H, g(x))
+      if ls == none:
         alpha = 1
-      elif self.linesearch == 'Exact':
+      elif ls == exact:
         alpha = self.exact_linesearch(x,s,0)
-      elif self.linesearch == 'Inexact':
-        alpha = self.exact_linesearch(x,s)
-      elif self.linesearch == 'Armijo':
-        alpha = self.armijo_linesearch(x,s)
+
       xold = x
       x = x-alpha*s
 
       if norm(np.array(x)-np.array(xold)) < tol:
-        if self.verbose:
-          print "Found answer in " + str(i) + " iterations."
         return x
 
     raise Exception("Didn't converge.")
-
-  def chol_solve(self,np.ndarray H,g):
-    cdef np.ndarray L, lp, Hi
-    try:
-      L = cholesky(H)
-      lp = solve_triangular(L.T, g, lower=True)
-      Hi = solve_triangular(L, lp)
-      return Hi
-    except:
-      raise Exception("G not pos. def. please pick a guess closer to the target.")
 
   def initial_h(self, np.ndarray x):
     cdef double h = 1e-8
@@ -81,13 +71,13 @@ class OptimizationMethod (object):
     ll = 0
     lu = 1
     tol = 1e-5
-    fprime = self.get_fprime_alpha(self.prob.g,x,-s)
-    while not fprime(lu) > 0:
+    #fprime = self.get_fprime_alpha(self.prob.g,x,-s)
+    while not cfprime(self.prob.g,x,-s,lu) > 0:
       lu = 2*lu
 
     while True:  
       a = (ll+lu)/2
-      tmp = fprime(a)
+      tmp = cfprime(self.prob.g,x,-s,a)
       if tmp > 0:
         lu = a
       elif tmp < 0:
@@ -99,42 +89,27 @@ class OptimizationMethod (object):
         break
     
     return a
-  
-  def freeze_function(self, f, np.ndarray x, np.ndarray s):
-    cdef double ap
-    return lambda ap:f(x + ap*s)
 
-  def get_fprime_alpha(self, g, np.ndarray x, np.ndarray s):
-    cdef double a
-    return lambda a: np.dot(g(x+a*s),s)
+cdef double cfprime(g, np.ndarray x, np.ndarray s, double a):
+  return np.dot(g(x+a*s),s)
 
-class QuasiNewton (OptimizationMethod):
-
-  # def initial_h(self,x):
-  #   return identity(size(x))
-  
-  def chol_solve(self,np.ndarray H,g):
+cdef np.ndarray chol_solve(np.ndarray H, np.ndarray g):
     return solve(H,g)  
 
-  def update(self, np.ndarray H, np.ndarray x, np.ndarray xold, double alpha, s):
-    print "Not implemented"
-  
-class BFGS (QuasiNewton):
-  def update(self, np.ndarray H, np.ndarray x, np.ndarray xold, double alpha, np.ndarray s):
+cdef np.ndarray update(g, np.ndarray H, np.ndarray x, np.ndarray xold, double alpha, np.ndarray s):
 
-    cdef np.ndarray delta, gamma, p1, p2, dH, Hd
+  cdef np.ndarray delta, gamma, p1, p2, dH, Hd
 
-    g = self.prob.g
-    delta = x - xold # alpha*s
-    gamma = g(x) - g(xold)
+  delta = x - xold # alpha*s
+  gamma = g(x) - g(xold)
 
-    p1 = np.outer(gamma,gamma)/np.inner(gamma,delta)
+  p1 = np.outer(gamma,gamma)/np.inner(gamma,delta)
 
-    Hd = H.dot(delta)
-    dH = (delta.T).dot(H)
-    p2 = Hd.dot(dH) / np.inner(dH, delta)
+  Hd = H.dot(delta)
+  dH = (delta.T).dot(H)
+  p2 = Hd.dot(dH) / np.inner(dH, delta)
 
-    #p1 = (1 + (gamma.T).dot(H).dot(gamma)/inner(delta, gamma))*(outer(delta, delta)/inner(delta, gamma))
+  #p1 = (1 + (gamma.T).dot(H).dot(gamma)/inner(delta, gamma))*(outer(delta, delta)/inner(delta, gamma))
 
-    #p2 = (outer(delta, gamma).dot(H) + H.dot(outer(gamma, delta)))/inner(delta, gamma)
-    return H + p1 - p2
+  #p2 = (outer(delta, gamma).dot(H) + H.dot(outer(gamma, delta)))/inner(delta, gamma)
+  return H + p1 - p2

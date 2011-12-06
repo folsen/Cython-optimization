@@ -8,7 +8,7 @@ x=linspace(0,1,5)
 
 def runtest():
 	prob = OptimizationProblem(chebyquad,gradchebyquad)
-	bfgs = BFGS(prob,linesearch='Exact')
+	bfgs = OptimizationMethod(prob,linesearch='Exact')
 	return bfgs(x)
 
 if __name__ == '__main__':
