@@ -6,36 +6,44 @@ cimport numpy as np
 cdef extern from "math.h":
   double abs(double)
 
-cdef np.ndarray bfgs(g, np.ndarray x, char* linesearch='None', ):
-  # Kor loopen
-  cdef int maxit = 100
-  cdef double tol = 1e-8
-  cdef double alpha 
-  cdef char* none = "None"
+class BFGS (object):
 
-  cdef np.ndarray H, xold, s
+  def __init__(self, g, linesearch='None'):
+    self.g = g
+    self.linesearch=linesearch
 
-  for i in range(0,maxit):
-    if i == 0:
-      # This function and the one below can be integrated into one
-      H = initial_h(g, x)
-    else:
-      # Update - this function and the one above can be integrated into one
-      H = update(g, H, x, xold, alpha, s)
+  def __call__(self, np.ndarray x):
+    # Kor loopen
+    cdef int maxit = 100
+    cdef double tol = 1e-8
+    cdef double alpha 
+    cdef char* ls = self.linesearch
+    cdef char* none = "None"
+    cdef char* exact = "Exact"
+    g = self.g
 
-    s = chol_solve(H, g(x))
-    if linesearch == none:
-      alpha = 1
-    else:
-      alpha = exact_linesearch(g,x,s,0)
+    cdef np.ndarray H, xold, s
 
-    xold = x
-    x = x-alpha*s
+    for i in range(0,maxit):
+      if i == 0:
+        # This function and the one below can be integrated into one
+        H = initial_h(g, x)
+      else:
+        # Update - this function and the one above can be integrated into one
+        H = update(g, H, x, xold, alpha, s)
 
-    if norm(np.array(x)-np.array(xold)) < tol:
-      return x
+      s = chol_solve(H, g(x))
+      if ls == none:
+        alpha = 1
+      else:
+        alpha = exact_linesearch(g,x,s,0)
 
-  raise Exception("Didn't converge.")
+      xold = x
+      x = x-alpha*s
+      if norm(np.array(x)-np.array(xold)) < tol:
+        return x
+
+    raise Exception("Didn't converge.")
 
 cdef np.ndarray initial_h(g, np.ndarray x):
   cdef double h = 1e-8
@@ -86,10 +94,7 @@ cdef np.ndarray update(g, np.ndarray H, np.ndarray x, np.ndarray xold, double al
   p1 = np.outer(gamma,gamma)/np.inner(gamma,delta)
 
   Hd = H.dot(delta)
-  dH = (delta.T).dot(H)
-  p2 = Hd.dot(dH) / np.inner(dH, delta)
+  dH = delta.dot(H)
+  p2 = np.outer(Hd, dH) / np.inner(dH, delta)
 
-  #p1 = (1 + (gamma.T).dot(H).dot(gamma)/inner(delta, gamma))*(outer(delta, delta)/inner(delta, gamma))
-
-  #p2 = (outer(delta, gamma).dot(H) + H.dot(outer(gamma, delta)))/inner(delta, gamma)
   return H + p1 - p2
