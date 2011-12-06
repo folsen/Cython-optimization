@@ -16,8 +16,9 @@ class OptimizationMethod (object):
 
   def __call__(self, x):
     # Kor loopen
-    maxit = 100
-    tol = 1e-8
+    cdef int maxit = 100
+    cdef double tol = 1e-8
+    cdef double alpha 
 
     g = self.prob.g
 
@@ -58,15 +59,16 @@ class OptimizationMethod (object):
       raise Exception("G not pos. def. please pick a guess closer to the target.")
 
   def initial_h(self, x):
-    h = 1e-8
+    cdef double h = 1e-8
     g = self.prob.g
     # Finite difference approximation
     Gb = array([(g(x + ei * h) - g(x))/h for ei in identity(size(x))])
     G = (1./2.) * (Gb + Gb.T)
     return G
 
-  def exact_linesearch(self, x, s, a_guess):
+  def exact_linesearch(self, x, s, double a_guess):
     #return fmin(self.freeze_function(self.prob.f, x, -s),0,disp=False)
+    cdef double a, ll, lu, tol, tmp
 
     a = a_guess
     ll = 0
@@ -105,11 +107,11 @@ class QuasiNewton (OptimizationMethod):
   def chol_solve(self,H,g):
     return solve(H,g)  
 
-  def update(self, H, x, xold, alpha, s):
+  def update(self, H, x, xold, double alpha, s):
     print "Not implemented"
   
 class BFGS (QuasiNewton):
-  def update(self, H, x, xold, alpha, s):
+  def update(self, H, x, xold, double alpha, s):
 
     g = self.prob.g
     delta = x - xold # alpha*s
