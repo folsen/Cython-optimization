@@ -14,36 +14,39 @@ class BFGS (object):
 
   def __call__(self, np.ndarray x):
     # Kor loopen
-    cdef int maxit = 100
-    cdef double tol = 1e-8
-    cdef double alpha 
-    cdef char* ls = self.linesearch
-    cdef char* none = "None"
-    cdef char* exact = "Exact"
-    g = self.g
+    return runbfgs(self.g, x, self.linesearch)
 
-    cdef np.ndarray H, xold, s
+cdef np.ndarray runbfgs(g, np.ndarray x, char* linesearch):
+  cdef int maxit = 100
+  cdef double tol = 1e-8
+  cdef double alpha 
+  cdef char* ls = linesearch
+  cdef char* none = "None"
+  cdef char* exact = "Exact"
+  #g = self.g
 
-    for i in range(0,maxit):
-      if i == 0:
-        # This function and the one below can be integrated into one
-        H = initial_h(g, x)
-      else:
-        # Update - this function and the one above can be integrated into one
-        H = update(g, H, x, xold, alpha, s)
+  cdef np.ndarray H, xold, s
 
-      s = chol_solve(H, g(x))
-      if ls == none:
-        alpha = 1
-      else:
-        alpha = exact_linesearch(g,x,s,0)
+  for i in range(0,maxit):
+    if i == 0:
+      # This function and the one below can be integrated into one
+      H = initial_h(g, x)
+    else:
+      # Update - this function and the one above can be integrated into one
+      H = update(g, H, x, xold, alpha, s)
 
-      xold = x
-      x = x-alpha*s
-      if norm(np.array(x)-np.array(xold)) < tol:
-        return x
+    s = chol_solve(H, g(x))
+    if ls == none:
+      alpha = 1
+    else:
+      alpha = exact_linesearch(g,x,s,0)
 
-    raise Exception("Didn't converge.")
+    xold = x
+    x = x-alpha*s
+    if norm(np.array(x)-np.array(xold)) < tol:
+      return x
+
+  raise Exception("Didn't converge.")
 
 cdef np.ndarray initial_h(g, np.ndarray x):
   cdef double h = 1e-8
