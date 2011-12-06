@@ -7,8 +7,7 @@ execfile('chebyquad_problem_.py')
 x=linspace(0,1,5)
 
 def runtest():
-	prob = OptimizationProblem(chebyquad,gradchebyquad)
-	bfgs = OptimizationMethod(prob,linesearch='Exact')
+	bfgs = BFGS(chebyquad,gradchebyquad,linesearch='Exact')
 	return bfgs(x)
 
 if __name__ == '__main__':
