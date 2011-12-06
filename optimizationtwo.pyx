@@ -4,52 +4,38 @@ import numpy as np
 cimport numpy as np
 
 cdef extern from "math.h":
-    double abs(double)
+  double abs(double)
 
-DTYPE = np.int
-ctypedef np.int_t DTYPE_T
+cdef np.ndarray bfgs(g, np.ndarray x, char* linesearch='None', ):
+  # Kor loopen
+  cdef int maxit = 100
+  cdef double tol = 1e-8
+  cdef double alpha 
+  cdef char* none = "None"
 
-class BFGS (object):
+  cdef np.ndarray H, xold, s
 
-  def __init__(self, f, g, linesearch='None', verbose=False):
-    self.f = f
-    self.g = g
-    self.linesearch=linesearch
-    self.verbose = verbose
+  for i in range(0,maxit):
+    if i == 0:
+      # This function and the one below can be integrated into one
+      H = initial_h(g, x)
+    else:
+      # Update - this function and the one above can be integrated into one
+      H = update(g, H, x, xold, alpha, s)
 
-  def __call__(self, np.ndarray x):
-    # Kor loopen
-    cdef int maxit = 100
-    cdef double tol = 1e-8
-    cdef double alpha 
-    cdef char* ls = self.linesearch
-    cdef char* none = "None"
-    cdef char* exact = "Exact"
-    g = self.g
+    s = chol_solve(H, g(x))
+    if linesearch == none:
+      alpha = 1
+    else:
+      alpha = exact_linesearch(g,x,s,0)
 
-    cdef np.ndarray H, xold, s
+    xold = x
+    x = x-alpha*s
 
-    for i in range(0,maxit):
-      if i == 0:
-        # This function and the one below can be integrated into one
-        H = initial_h(g, x)
-      else:
-        # Update - this function and the one above can be integrated into one
-        H = update(g, H, x, xold, alpha, s)
+    if norm(np.array(x)-np.array(xold)) < tol:
+      return x
 
-      s = chol_solve(H, g(x))
-      if ls == none:
-        alpha = 1
-      elif ls == exact:
-        alpha = exact_linesearch(g,x,s,0)
-
-      xold = x
-      x = x-alpha*s
-
-      if norm(np.array(x)-np.array(xold)) < tol:
-        return x
-
-    raise Exception("Didn't converge.")
+  raise Exception("Didn't converge.")
 
 cdef np.ndarray initial_h(g, np.ndarray x):
   cdef double h = 1e-8

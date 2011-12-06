@@ -7,8 +7,8 @@ execfile('chebyquad_problem_.py')
 x=linspace(0,1,5)
 
 def runtest():
-	bfgs = BFGS(chebyquad,gradchebyquad,linesearch='Exact')
-	return bfgs(x)
+	#bfgs = BFGS(chebyquad,gradchebyquad,linesearch='Exact')
+	return bfgs(gradchebyquad, x, linesearch='Exact')
 
 if __name__ == '__main__':
 	from timeit import Timer
